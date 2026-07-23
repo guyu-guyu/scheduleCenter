@@ -158,11 +158,84 @@ namespace ScheduleCenter.Gui
             if (editor.ShowDialog() == true)
                 Refresh();
         }
-        internal void EditTask() { /* Task 13 */ }
-        internal void DeleteTask() { /* Task 13 */ }
-        internal void ToggleEnabled() { /* Task 13 */ }
-        internal void RunTask() { /* Task 13 */ }
-        internal void CopyCli() { /* Task 13 */ }
+        internal void EditTask()
+        {
+            if (SelectedTask == null) return;
+            try
+            {
+                TaskInfo current = Service.Get(SelectedTask.Info.RelativeName);
+                var editor = new EditorWindow(Service, current);
+                editor.Owner = System.Windows.Application.Current.MainWindow;
+                if (editor.ShowDialog() == true)
+                    Refresh();
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void DeleteTask()
+        {
+            if (SelectedTask == null) return;
+            string name = SelectedTask.Info.RelativeName;
+            System.Windows.MessageBoxResult confirm = System.Windows.MessageBox.Show(
+                "确定要删除任务 '" + name + "' 吗？", "确认删除",
+                System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+            if (confirm != System.Windows.MessageBoxResult.Yes) return;
+            try
+            {
+                Service.Delete(name, true);
+                Refresh();
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void ToggleEnabled()
+        {
+            if (SelectedTask == null) return;
+            try
+            {
+                Service.SetEnabled(SelectedTask.Info.RelativeName, !SelectedTask.Info.Enabled);
+                Refresh();
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void RunTask()
+        {
+            if (SelectedTask == null) return;
+            try
+            {
+                Service.Run(SelectedTask.Info.RelativeName);
+                StatusText = "已触发运行: " + SelectedTask.Info.RelativeName;
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void CopyCli()
+        {
+            if (SelectedTask == null) return;
+            try
+            {
+                TaskInfo current = Service.Get(SelectedTask.Info.RelativeName);
+                System.Windows.Clipboard.SetText(Service.BuildAddCommand(current));
+                StatusText = "CLI 命令已复制到剪贴板";
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
         internal void LoadHistory() { /* Task 14 */ }
 
         internal static void ShowError(TaskServiceException ex)
