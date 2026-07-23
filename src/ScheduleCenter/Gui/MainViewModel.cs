@@ -236,7 +236,42 @@ namespace ScheduleCenter.Gui
                 ShowError(ex);
             }
         }
-        internal void LoadHistory() { /* Task 14 */ }
+        internal void LoadHistory()
+        {
+            HistoryEvents.Clear();
+            if (SelectedTask == null)
+            {
+                HistoryTitle = "运行历史";
+                return;
+            }
+
+            string name = SelectedTask.Info.RelativeName;
+            HistoryTitle = "运行历史 - " + name;
+            try
+            {
+                bool errorsOnly = HistoryFilter == "仅错误";
+                var events = Service.GetHistory(name, 50, errorsOnly);
+                foreach (HistoryEvent ev in events)
+                {
+                    var row = new HistoryRowViewModel(ev);
+                    if (HistoryFilter == "仅完成" && !row.IsCompleted) continue;
+                    HistoryEvents.Add(row);
+                }
+            }
+            catch (TaskServiceException ex)
+            {
+                if (ex.Code == ErrorCode.HistoryDisabled)
+                {
+                    System.Windows.MessageBox.Show(
+                        "系统未启用任务历史记录。\n\n请在 Windows\"任务计划程序\"右侧操作栏点击\"启用所有任务历史记录\"，然后回到本程序刷新。",
+                        "历史记录不可用", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                }
+                else
+                {
+                    ShowError(ex);
+                }
+            }
+        }
 
         internal static void ShowError(TaskServiceException ex)
         {
