@@ -151,7 +151,13 @@ namespace ScheduleCenter.Gui
             Folders.Clear();
             Folders.Add(root);
         }
-        internal void NewTask() { /* Task 12 */ }
+        internal void NewTask()
+        {
+            var editor = new EditorWindow(Service, null);
+            editor.Owner = System.Windows.Application.Current.MainWindow;
+            if (editor.ShowDialog() == true)
+                Refresh();
+        }
         internal void EditTask() { /* Task 13 */ }
         internal void DeleteTask() { /* Task 13 */ }
         internal void ToggleEnabled() { /* Task 13 */ }
