@@ -72,6 +72,8 @@ ScheduleCenter history --name <名称> [--last <N>] [--errors-only]
 
 所有命令的 `--name` 均相对于 `\ScheduleCenter\` 文件夹；支持子文件夹路径，如 `--name "MyApp\Backup"` 对应 `\ScheduleCenter\MyApp\Backup`。
 
+**delete 的确认语义：** CLI 为非交互场景设计，不提示输入。`delete` 不带 `--force` 时不执行删除，返回错误 `CONFIRM_REQUIRED`（退出码 2）；带 `--force` 才真正删除。GUI 则通过确认对话框完成同样的确认动作。
+
 ### 触发器参数规则
 
 | trigger | 必需参数 | 可选参数 |
@@ -180,6 +182,7 @@ ScheduleCenter history --name <名称> [--last <N>] [--errors-only]
 | code | 退出码 | 触发场景 |
 |---|---|---|
 | `INVALID_ARGUMENTS` | 2 | 缺必需参数、时间格式错误、trigger 与参数组合非法 |
+| `CONFIRM_REQUIRED` | 2 | delete 未带 `--force` |
 | `TASK_NOT_FOUND` | 4 | get/update/delete/enable/disable/run/history 找不到任务（在 `\ScheduleCenter\` 内） |
 | `TASK_EXISTS` | 5 | add 同名任务已存在 |
 | `ACCESS_DENIED` | 3 | 非管理员运行或权限不足 |
