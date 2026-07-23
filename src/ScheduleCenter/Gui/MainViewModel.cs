@@ -262,9 +262,13 @@ namespace ScheduleCenter.Gui
             {
                 if (ex.Code == ErrorCode.HistoryDisabled)
                 {
-                    System.Windows.MessageBox.Show(
-                        "系统未启用任务历史记录。\n\n请在 Windows\"任务计划程序\"右侧操作栏点击\"启用所有任务历史记录\"，然后回到本程序刷新。",
-                        "历史记录不可用", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+                    HistoryTitle = "运行历史 - " + name + "（历史记录未启用）";
+                    HistoryEvents.Add(new HistoryRowViewModel(new HistoryEvent
+                    {
+                        Time = DateTime.Now,
+                        Type = "other",
+                        Message = "系统未启用任务历史记录。请在 Windows 任务计划程序右侧操作栏点击「启用所有任务历史记录」，然后回到本程序刷新。"
+                    }));
                 }
                 else
                 {
