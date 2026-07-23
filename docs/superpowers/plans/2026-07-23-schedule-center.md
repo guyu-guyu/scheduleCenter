@@ -3462,13 +3462,7 @@ namespace ScheduleCenter.Gui
 
         public ICommand SaveCommand { get; private set; }
         public ICommand CancelCommand { get; private set; }
-    }
-}
-```
 
-> 注：上面的 `EditorViewModel` 类还缺 `BuildTrigger` 和 `Save` 两个方法，在类内部 `CancelCommand` 属性之后追加：
-
-```csharp
         private TriggerSpec BuildTrigger()
         {
             var spec = new TriggerSpec { Kind = (TriggerKind)_triggerTypeIndex };
@@ -3555,6 +3549,8 @@ namespace ScheduleCenter.Gui
             Action<bool> handler = RequestClose;
             if (handler != null) handler(saved);
         }
+    }
+}
 ```
 
 - [ ] **Step 2: EditorWindow.xaml**
