@@ -82,8 +82,75 @@ namespace ScheduleCenter.Gui
             RefreshHistoryCommand = new RelayCommand(LoadHistory, () => SelectedTask != null);
         }
 
-        internal void Refresh() { /* Task 11 */ }
-        internal void ApplyFilter() { /* Task 11 */ }
+        internal void Refresh()
+        {
+            try
+            {
+                _allTasks = new List<TaskInfo>(Service.List(null));
+                BuildFolderTree();
+                ApplyFilter();
+                StatusText = "共 " + _allTasks.Count + " 个任务";
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void ApplyFilter()
+        {
+            Tasks.Clear();
+            string folderPath = SelectedFolder == null ? "" : SelectedFolder.FullPath;
+            foreach (TaskInfo t in _allTasks)
+            {
+                if (!string.IsNullOrEmpty(folderPath))
+                {
+                    string expected = ScheduledTaskService.RootFolderPath + "\\" + folderPath;
+                    if (!string.Equals(t.Folder, expected, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                }
+                if (!string.IsNullOrEmpty(SearchText) &&
+                    t.RelativeName.IndexOf(SearchText, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+                Tasks.Add(new TaskRowViewModel(t));
+            }
+        }
+
+        private void BuildFolderTree()
+        {
+            var root = new FolderNode { Name = "ScheduleCenter", FullPath = "" };
+            var nodes = new Dictionary<string, FolderNode>(StringComparer.OrdinalIgnoreCase);
+            nodes[""] = root;
+
+            foreach (TaskInfo t in _allTasks)
+            {
+                string folder = t.Folder;
+                if (!folder.StartsWith(ScheduledTaskService.RootFolderPath)) continue;
+                string rel = folder.Length > ScheduledTaskService.RootFolderPath.Length
+                    ? folder.Substring(ScheduledTaskService.RootFolderPath.Length + 1)
+                    : "";
+                if (string.IsNullOrEmpty(rel) || nodes.ContainsKey(rel)) continue;
+
+                string[] parts = rel.Split('\\');
+                string path = "";
+                FolderNode parent = root;
+                foreach (string part in parts)
+                {
+                    path = path.Length == 0 ? part : path + "\\" + part;
+                    FolderNode node;
+                    if (!nodes.TryGetValue(path, out node))
+                    {
+                        node = new FolderNode { Name = part, FullPath = path };
+                        nodes[path] = node;
+                        parent.Children.Add(node);
+                    }
+                    parent = node;
+                }
+            }
+
+            Folders.Clear();
+            Folders.Add(root);
+        }
         internal void NewTask() { /* Task 12 */ }
         internal void EditTask() { /* Task 13 */ }
         internal void DeleteTask() { /* Task 13 */ }
