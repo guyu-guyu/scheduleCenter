@@ -76,9 +76,21 @@ ScheduleCenter run     --name <名称>
 ScheduleCenter history --name <名称> [--last <N>] [--errors-only]
 ScheduleCenter export  --name <名称> [--output <文件路径>]
 ScheduleCenter import  --file <XML 文件路径> --name <名称> [--force]
+ScheduleCenter help      显示人友好的完整帮助文本（stdout，退出码 0）
+ScheduleCenter h         help 的别名
+ScheduleCenter manifest  输出机器可读的 CLI 清单 JSON（供 agent 解析命令、参数、类型、示例、错误码、退出码）
 ```
 
 所有 `--name` 均相对于 `\ScheduleCenter\` 文件夹；支持子文件夹路径，如 `--name "MyApp\Backup"` 对应 `\ScheduleCenter\MyApp\Backup`。
+
+### 自描述清单
+
+工具内置 CLI 清单，便于人类用户和 agent 自动发现命令与参数（清单内容由 `src/ScheduleCenter/Cli/cli-manifest.json` 配置，编译为嵌入资源，不硬编码在代码中）：
+
+- `ScheduleCenter help` 或 `ScheduleCenter h` — 输出人友好的完整帮助文本（命令列表 + 用法提示），并在结尾提示 agent 调用 `manifest` 获取机器可读清单
+- `ScheduleCenter manifest` — 输出机器可读的 JSON 清单，包含所有命令、选项（含类型/必填/描述）、示例、错误码、退出码、互斥规则、输出形状 schema
+
+调用未知命令时，工具会输出简短提示并建议运行 `help` 或 `manifest`；**agent 调用应优先使用 `manifest` 命令**以获取完整调用契约。
 
 ### 双轨触发器语法
 
@@ -158,12 +170,15 @@ ScheduleCenter.sln
 │  ├─ HistoryService.cs                  历史事件读取
 │  └─ CliCommandBuilder.cs               TaskInfo → 等效 add CLI 命令
 ├─ src/ScheduleCenter/                   WPF 主程序（net48 WinExe）
-│  ├─ Cli/                               CLI 解析、调度、输出、DTO
+│  ├─ Cli/                               CLI 解析、调度、输出、自描述清单
 │  │  ├─ CliParser.cs                    参数解析 + 互斥校验
 │  │  ├─ SpecBuilder.cs                  ParsedArgs → TaskSpec/TaskUpdate（含多触发器 JSON 解析）
 │  │  ├─ TaskDto.cs                      TaskInfo → JSON DTO
-│  │  ├─ CliRunner.cs                    子命令分发
-│  │  └─ OutputWriter.cs                 stdout/stderr JSON 输出
+│  │  ├─ CliRunner.cs                    子命令分发（含 help/h/manifest）
+│  │  ├─ OutputWriter.cs                 stdout/stderr JSON 输出
+│  │  ├─ ManifestProvider.cs             加载嵌入清单 JSON，渲染 help 文本与 manifest JSON
+│  │  ├─ cli-manifest.json               CLI 清单配置（命令/选项/类型/示例/错误码/退出码，嵌入资源）
+│  │  └─ ConsoleHelper.cs                控制台附加 + UTF-8 输出编码
 │  ├─ Gui/                               MVVM 视图模型
 │  │  ├─ MainViewModel.cs                主窗口 VM
 │  │  ├─ EditorViewModel.cs              编辑器 VM（多触发器列表 + Idle/Event + 高级条件）

@@ -142,6 +142,20 @@ namespace ScheduleCenter.Cli
                 OutputWriter.Error(command, ex);
                 return ex.ExitCode;
             }
+            catch (UnknownCommandException ex)
+            {
+                // 未知命令走简短提示路径（非 JSON），避免把完整 help 塞进 JSON message 字段
+                Console.Error.WriteLine(ex.Message);
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("可用命令: add, update, delete, get, list, enable, disable, run, history, export, import, help, manifest");
+                Console.Error.WriteLine();
+                Console.Error.WriteLine("提示:");
+                Console.Error.WriteLine("  - 运行 'ScheduleCenter help' 查看完整帮助");
+                Console.Error.WriteLine("  - 运行 'ScheduleCenter manifest' 获取机器可读的 CLI 清单 JSON");
+                Console.Error.WriteLine("  - Agent 调用应优先使用 'ScheduleCenter manifest' 命令以获取完整的命令、参数及类型信息");
+                Console.Error.Flush();
+                return 2;
+            }
             catch (Exception ex)
             {
                 OutputWriter.Error(command, new TaskServiceException(ErrorCode.InternalError, ex.Message, ex));

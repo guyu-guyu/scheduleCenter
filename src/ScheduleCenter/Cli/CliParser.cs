@@ -62,8 +62,7 @@ namespace ScheduleCenter.Cli
 
             string command = args[0].ToLowerInvariant();
             if (!Commands.Contains(command))
-                throw new TaskServiceException(ErrorCode.InvalidArguments,
-                    "未知命令 '" + args[0] + "'\n" + Usage());
+                throw new UnknownCommandException(args[0]);
 
             var result = new ParsedArgs { Command = command };
             for (int i = 1; i < args.Length; i++)
