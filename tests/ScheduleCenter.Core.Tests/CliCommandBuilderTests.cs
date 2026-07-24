@@ -91,5 +91,41 @@ namespace ScheduleCenter.Core.Tests
             StringAssert.Contains(cmd, "--date 2026-08-01");
             StringAssert.Contains(cmd, "--time 08:30");
         }
+
+        [TestMethod]
+        public void BuildAddCommand_SingleTrigger_V1StyleOutput()
+        {
+            var info = new TaskInfo
+            {
+                RelativeName = "X",
+                Path = @"C:\app.exe",
+                Triggers = new List<TriggerSpec>
+                {
+                    new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) }
+                }
+            };
+            string cmd = CliCommandBuilder.BuildAddCommand(info);
+            StringAssert.Contains(cmd, "--trigger daily");
+            StringAssert.Contains(cmd, "--time 09:00");
+            Assert.IsFalse(cmd.Contains("--triggers-json"));
+        }
+
+        [TestMethod]
+        public void BuildAddCommand_MultiTrigger_OutputsTriggersJson()
+        {
+            var info = new TaskInfo
+            {
+                RelativeName = "X",
+                Path = @"C:\app.exe",
+                Triggers = new List<TriggerSpec>
+                {
+                    new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) },
+                    new TriggerSpec { Kind = TriggerKind.Boot }
+                }
+            };
+            string cmd = CliCommandBuilder.BuildAddCommand(info);
+            StringAssert.Contains(cmd, "--triggers-json");
+            Assert.IsFalse(cmd.Contains("--trigger daily"));
+        }
     }
 }

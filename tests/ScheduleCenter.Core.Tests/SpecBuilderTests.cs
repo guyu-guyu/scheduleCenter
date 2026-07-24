@@ -73,5 +73,47 @@ namespace ScheduleCenter.Core.Tests
             var ex = Assert.ThrowsException<TaskServiceException>(() => SpecBuilder.BuildUpdate(p));
             Assert.AreEqual(ErrorCode.InvalidArguments, ex.Code);
         }
+
+        [TestMethod]
+        public void BuildSpec_TriggersJson_ProducesMultipleTriggers()
+        {
+            var parsed = CliParser.Parse(new[] { "add", "--name", "X", "--path", @"C:\Windows\System32\cmd.exe",
+                "--triggers-json", "[{\"kind\":\"daily\",\"time\":\"09:00\"},{\"kind\":\"boot\"}]" });
+            TaskSpec spec = SpecBuilder.BuildSpec(parsed);
+            Assert.AreEqual(2, spec.Triggers.Count);
+            Assert.AreEqual(TriggerKind.Daily, spec.Triggers[0].Kind);
+            Assert.AreEqual(TriggerKind.Boot, spec.Triggers[1].Kind);
+        }
+
+        [TestMethod]
+        public void BuildSpec_SingleTrigger_V1Compat_ProducesOneElementList()
+        {
+            var parsed = CliParser.Parse(new[] { "add", "--name", "X", "--path", @"C:\Windows\System32\cmd.exe",
+                "--trigger", "daily", "--time", "09:00" });
+            TaskSpec spec = SpecBuilder.BuildSpec(parsed);
+            Assert.AreEqual(1, spec.Triggers.Count);
+            Assert.AreEqual(TriggerKind.Daily, spec.Triggers[0].Kind);
+        }
+
+        [TestMethod]
+        public void BuildSpec_EventTrigger_SimplifiedArgs()
+        {
+            var parsed = CliParser.Parse(new[] { "add", "--name", "X", "--path", @"C:\Windows\System32\cmd.exe",
+                "--trigger", "event", "--event-log", "System", "--event-id", "42" });
+            TaskSpec spec = SpecBuilder.BuildSpec(parsed);
+            Assert.AreEqual(1, spec.Triggers.Count);
+            Assert.AreEqual(TriggerKind.Event, spec.Triggers[0].Kind);
+            Assert.AreEqual("System", spec.Triggers[0].EventLog);
+            Assert.AreEqual(42, spec.Triggers[0].EventId);
+        }
+
+        [TestMethod]
+        public void BuildSpec_ExecutionTimeLimit_Propagated()
+        {
+            var parsed = CliParser.Parse(new[] { "add", "--name", "X", "--path", @"C:\Windows\System32\cmd.exe",
+                "--trigger", "daily", "--time", "09:00", "--execution-time-limit", "30" });
+            TaskSpec spec = SpecBuilder.BuildSpec(parsed);
+            Assert.AreEqual(System.TimeSpan.FromMinutes(30), spec.ExecutionTimeLimit);
+        }
     }
 }

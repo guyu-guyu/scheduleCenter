@@ -64,5 +64,69 @@ namespace ScheduleCenter.Core.Tests
             var ex = Assert.ThrowsException<TaskServiceException>(() => p.Require("path"));
             Assert.AreEqual(ErrorCode.InvalidArguments, ex.Code);
         }
+
+        [TestMethod]
+        public void Parse_TriggersJson_OptionRecognized()
+        {
+            var parsed = CliParser.Parse(new[] { "add", "--name", "X", "--path", "C:\\x.exe",
+                "--triggers-json", "[{\"kind\":\"daily\",\"time\":\"09:00\"}]" });
+            Assert.AreEqual("add", parsed.Command);
+            Assert.IsTrue(parsed.Has("triggers-json"));
+        }
+
+        [TestMethod]
+        public void Parse_TriggerAndTriggersJson_MutuallyExclusive_Throws()
+        {
+            try
+            {
+                CliParser.Parse(new[] { "add", "--name", "X", "--path", "C:\\x.exe",
+                    "--trigger", "daily", "--time", "09:00",
+                    "--triggers-json", "[{\"kind\":\"daily\",\"time\":\"09:00\"}]" });
+                Assert.Fail("应抛互斥错误");
+            }
+            catch (TaskServiceException ex)
+            {
+                Assert.AreEqual(ErrorCode.InvalidArguments, ex.Code);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_EventLogAndEventSubscription_MutuallyExclusive_Throws()
+        {
+            try
+            {
+                CliParser.Parse(new[] { "add", "--name", "X", "--path", "C:\\x.exe",
+                    "--trigger", "event", "--event-log", "System", "--event-subscription", "<q/>" });
+                Assert.Fail("应抛互斥错误");
+            }
+            catch (TaskServiceException ex)
+            {
+                Assert.AreEqual(ErrorCode.InvalidArguments, ex.Code);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_IdleArgsWithNonIdleTrigger_Throws()
+        {
+            try
+            {
+                CliParser.Parse(new[] { "add", "--name", "X", "--path", "C:\\x.exe",
+                    "--trigger", "daily", "--time", "09:00", "--idle-wait", "5" });
+                Assert.Fail("应抛错误");
+            }
+            catch (TaskServiceException ex)
+            {
+                Assert.AreEqual(ErrorCode.InvalidArguments, ex.Code);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_ExportImport_CommandsRecognized()
+        {
+            var p1 = CliParser.Parse(new[] { "export", "--name", "X", "--output", "C:\\x.xml" });
+            Assert.AreEqual("export", p1.Command);
+            var p2 = CliParser.Parse(new[] { "import", "--file", "C:\\x.xml", "--name", "Y" });
+            Assert.AreEqual("import", p2.Command);
+        }
     }
 }
