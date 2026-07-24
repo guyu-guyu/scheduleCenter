@@ -1,7 +1,8 @@
 <Window x:Class="ScheduleCenter.EditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="{Binding Title}" Width="480" Height="520"
+        xmlns:local="clr-namespace:ScheduleCenter.Gui"
+        Title="{Binding Title}" Width="560" Height="640"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="8">
         <Grid.RowDefinitions>
@@ -31,36 +32,102 @@
                     <TextBox Text="{Binding WorkingDirectory}" Margin="0,2,0,8"/>
                     <CheckBox Content="以 SYSTEM 账户运行" IsChecked="{Binding RunAsSystem}" Margin="0,2"/>
                     <CheckBox Content="使用最高权限运行" IsChecked="{Binding Highest}" Margin="0,2"/>
-                    <CheckBox Content="启用" IsChecked="{Binding Enabled}" Margin="0,2"/>
+                    <CheckBox Content="启用" IsChecked="{Binding Enabled}" Margin="0,2,8,0"/>
+
+                    <GroupBox Header="高级条件" Margin="0,8,0,0">
+                        <StackPanel Margin="4">
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="执行时间限制(分钟, 0=无限): " VerticalAlignment="Center"/>
+                                <TextBox Text="{Binding ExecutionTimeLimitText}" Width="80"/>
+                            </StackPanel>
+                            <CheckBox Content="电池供电时不启动" IsChecked="{Binding DisallowStartIfOnBatteries}" Margin="0,2"/>
+                            <CheckBox Content="切换到电池时停止任务" IsChecked="{Binding StopIfGoingOnBatteries}" Margin="0,2"/>
+                        </StackPanel>
+                    </GroupBox>
                 </StackPanel>
             </TabItem>
             <TabItem Header="触发器">
-                <StackPanel Margin="8">
-                    <TextBlock Text="触发器类型:"/>
-                    <ComboBox ItemsSource="{Binding TriggerTypes}"
-                              SelectedIndex="{Binding TriggerTypeIndex}" Margin="0,2,0,12"/>
-                    <StackPanel Visibility="{Binding ShowTime}">
-                        <TextBlock Text="时间 (HH:mm):"/>
-                        <TextBox Text="{Binding TimeText}" Width="100" HorizontalAlignment="Left" Margin="0,2,0,8"/>
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                        <Button Content="+ 新增触发器" Command="{Binding AddTriggerCommand}" Padding="6,2" Margin="0,0,4,0"/>
+                        <Button Content="删除选中" Command="{Binding RemoveTriggerCommand}" Padding="6,2"/>
                     </StackPanel>
-                    <StackPanel Visibility="{Binding ShowDate}">
-                        <TextBlock Text="日期:"/>
-                        <DatePicker SelectedDate="{Binding Date}" HorizontalAlignment="Left" Margin="0,2,0,8"/>
-                    </StackPanel>
-                    <StackPanel Visibility="{Binding ShowWeekdays}" Orientation="Horizontal" Margin="0,2,0,8">
-                        <CheckBox Content="一" IsChecked="{Binding Mon}" Margin="0,0,6,0"/>
-                        <CheckBox Content="二" IsChecked="{Binding Tue}" Margin="0,0,6,0"/>
-                        <CheckBox Content="三" IsChecked="{Binding Wed}" Margin="0,0,6,0"/>
-                        <CheckBox Content="四" IsChecked="{Binding Thu}" Margin="0,0,6,0"/>
-                        <CheckBox Content="五" IsChecked="{Binding Fri}" Margin="0,0,6,0"/>
-                        <CheckBox Content="六" IsChecked="{Binding Sat}" Margin="0,0,6,0"/>
-                        <CheckBox Content="日" IsChecked="{Binding Sun}"/>
-                    </StackPanel>
-                    <StackPanel Visibility="{Binding ShowDayOfMonth}">
-                        <TextBlock Text="每月第几天 (1-31):"/>
-                        <TextBox Text="{Binding DayOfMonthText}" Width="60" HorizontalAlignment="Left" Margin="0,2,0,8"/>
-                    </StackPanel>
-                </StackPanel>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ListBox Grid.Column="0"
+                                 ItemsSource="{Binding Triggers}"
+                                 SelectedIndex="{Binding SelectedTriggerIndex}"
+                                 Margin="0,0,4,0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding ., Converter={x:Static local:TriggerSummaryConverter.Instance}}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="触发器类型:"/>
+                            <ComboBox ItemsSource="{Binding TriggerTypes}"
+                                      SelectedIndex="{Binding TriggerTypeIndex}" Margin="0,2,0,8"/>
+
+                            <StackPanel Visibility="{Binding ShowTime}">
+                                <TextBlock Text="时间 (HH:mm):"/>
+                                <TextBox Text="{Binding TimeText}" Width="100" HorizontalAlignment="Left" Margin="0,2,0,8"/>
+                            </StackPanel>
+                            <StackPanel Visibility="{Binding ShowDate}">
+                                <TextBlock Text="日期:"/>
+                                <DatePicker SelectedDate="{Binding Date}" HorizontalAlignment="Left" Margin="0,2,0,8"/>
+                            </StackPanel>
+                            <StackPanel Visibility="{Binding ShowWeekdays}" Orientation="Horizontal" Margin="0,2,0,8">
+                                <CheckBox Content="一" IsChecked="{Binding Mon}" Margin="0,0,6,0"/>
+                                <CheckBox Content="二" IsChecked="{Binding Tue}" Margin="0,0,6,0"/>
+                                <CheckBox Content="三" IsChecked="{Binding Wed}" Margin="0,0,6,0"/>
+                                <CheckBox Content="四" IsChecked="{Binding Thu}" Margin="0,0,6,0"/>
+                                <CheckBox Content="五" IsChecked="{Binding Fri}" Margin="0,0,6,0"/>
+                                <CheckBox Content="六" IsChecked="{Binding Sat}" Margin="0,0,6,0"/>
+                                <CheckBox Content="日" IsChecked="{Binding Sun}"/>
+                            </StackPanel>
+                            <StackPanel Visibility="{Binding ShowDayOfMonth}">
+                                <TextBlock Text="每月第几天 (1-31):"/>
+                                <TextBox Text="{Binding DayOfMonthText}" Width="60" HorizontalAlignment="Left" Margin="0,2,0,8"/>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding ShowIdle}">
+                                <TextBlock Text="空闲等待(分钟):"/>
+                                <TextBox Text="{Binding IdleWaitText}" Width="80" HorizontalAlignment="Left" Margin="0,2,0,8"/>
+                                <CheckBox Content="空闲结束时停止任务" IsChecked="{Binding IdleStopOnEnd}" Margin="0,2,0,4"/>
+                                <CheckBox Content="空闲中断后重新计时" IsChecked="{Binding IdleRestart}"/>
+                            </StackPanel>
+
+                            <StackPanel Visibility="{Binding ShowEvent}">
+                                <CheckBox Content="使用完整 XPath" IsChecked="{Binding UseEventSubscription}" Margin="0,2,0,8"/>
+                                <StackPanel Visibility="{Binding ShowEventSimple}">
+                                    <TextBlock Text="日志名:"/>
+                                    <TextBox Text="{Binding EventLog}" Margin="0,2,0,8"/>
+                                    <TextBlock Text="源(可选):"/>
+                                    <TextBox Text="{Binding EventSource}" Margin="0,2,0,8"/>
+                                    <TextBlock Text="事件ID(可选):"/>
+                                    <TextBox Text="{Binding EventIdText}" Width="100" HorizontalAlignment="Left" Margin="0,2,0,8"/>
+                                </StackPanel>
+                                <StackPanel Visibility="{Binding ShowEventXPath}">
+                                    <TextBlock Text="XPath 订阅:"/>
+                                    <TextBox Text="{Binding EventSubscription}" Height="100" AcceptsReturn="True"
+                                             TextWrapping="Wrap" VerticalScrollBarVisibility="Visible" Margin="0,2,0,8"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
             </TabItem>
         </TabControl>
 

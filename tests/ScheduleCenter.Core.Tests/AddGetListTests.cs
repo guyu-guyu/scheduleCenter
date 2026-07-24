@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ScheduleCenter.Core;
@@ -16,7 +17,7 @@ namespace ScheduleCenter.Core.Tests
                 Path = TestExe,
                 Arguments = "/c exit 0",
                 Description = "集成测试任务",
-                Trigger = trigger,
+                Triggers = new List<TriggerSpec> { trigger },
                 Highest = true
             };
         }
@@ -39,7 +40,7 @@ namespace ScheduleCenter.Core.Tests
                 string name = UniqueName(trigger.Kind.ToString());
                 TaskInfo info = Service.Add(Spec(name, trigger));
                 Assert.AreEqual(name, info.RelativeName);
-                Assert.AreEqual(trigger.Kind, info.Trigger.Kind);
+                Assert.AreEqual(trigger.Kind, info.Triggers[0].Kind);
                 Assert.IsTrue(info.Highest);
 
                 TaskInfo got = Service.Get(name);

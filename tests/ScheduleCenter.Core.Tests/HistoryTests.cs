@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ScheduleCenter.Core;
@@ -21,7 +22,7 @@ namespace ScheduleCenter.Core.Tests
                 Name = name,
                 Path = TestExe,
                 Arguments = "/c exit 0",
-                Trigger = new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) }
+                Triggers = new List<TriggerSpec> { new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) } }
             });
             Service.Run(name);
 

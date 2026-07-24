@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ScheduleCenter.Core;
 
@@ -20,11 +21,14 @@ namespace ScheduleCenter.Core.Tests
                 Enabled = true,
                 Highest = true,
                 RunAsSystem = false,
-                Trigger = new TriggerSpec
+                Triggers = new List<TriggerSpec>
                 {
-                    Kind = TriggerKind.Weekly,
-                    Time = new TimeSpan(9, 0, 0),
-                    Days = new[] { DayOfWeek.Monday, DayOfWeek.Friday }
+                    new TriggerSpec
+                    {
+                        Kind = TriggerKind.Weekly,
+                        Time = new TimeSpan(9, 0, 0),
+                        Days = new[] { DayOfWeek.Monday, DayOfWeek.Friday }
+                    }
                 }
             };
 
@@ -52,7 +56,7 @@ namespace ScheduleCenter.Core.Tests
                 Path = @"C:\svc.exe",
                 Enabled = true,
                 RunAsSystem = true,
-                Trigger = new TriggerSpec { Kind = TriggerKind.Boot }
+                Triggers = new List<TriggerSpec> { new TriggerSpec { Kind = TriggerKind.Boot } }
             };
 
             string cmd = CliCommandBuilder.BuildAddCommand(info);
@@ -70,11 +74,14 @@ namespace ScheduleCenter.Core.Tests
             {
                 RelativeName = "Once",
                 Path = @"C:\app.exe",
-                Trigger = new TriggerSpec
+                Triggers = new List<TriggerSpec>
                 {
-                    Kind = TriggerKind.Once,
-                    Date = new DateTime(2026, 8, 1),
-                    Time = new TimeSpan(8, 30, 0)
+                    new TriggerSpec
+                    {
+                        Kind = TriggerKind.Once,
+                        Date = new DateTime(2026, 8, 1),
+                        Time = new TimeSpan(8, 30, 0)
+                    }
                 }
             };
 

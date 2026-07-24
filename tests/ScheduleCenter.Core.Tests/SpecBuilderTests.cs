@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ScheduleCenter.Cli;
 using ScheduleCenter.Core;
@@ -21,11 +22,11 @@ namespace ScheduleCenter.Core.Tests
             TaskSpec spec = SpecBuilder.BuildSpec(p);
 
             Assert.AreEqual("Backup", spec.Name);
-            Assert.AreEqual(TriggerKind.Weekly, spec.Trigger.Kind);
-            Assert.AreEqual(new TimeSpan(9, 0, 0), spec.Trigger.Time);
+            Assert.AreEqual(TriggerKind.Weekly, spec.Triggers[0].Kind);
+            Assert.AreEqual(new TimeSpan(9, 0, 0), spec.Triggers[0].Time);
             CollectionAssert.AreEqual(
                 new[] { DayOfWeek.Monday, DayOfWeek.Wednesday, DayOfWeek.Friday },
-                spec.Trigger.Days);
+                spec.Triggers[0].Days);
             Assert.IsTrue(spec.Enabled);
         }
 
@@ -61,8 +62,8 @@ namespace ScheduleCenter.Core.Tests
 
             Assert.AreEqual("Backup", u.Name);
             Assert.IsNull(u.Path);
-            Assert.IsNotNull(u.Trigger);
-            Assert.AreEqual(TriggerKind.Daily, u.Trigger.Kind);
+            Assert.IsNotNull(u.Triggers);
+            Assert.AreEqual(TriggerKind.Daily, u.Triggers[0].Kind);
         }
 
         [TestMethod]

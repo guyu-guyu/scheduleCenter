@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ScheduleCenter.Core;
 
@@ -88,7 +89,7 @@ namespace ScheduleCenter.Core.Tests
             {
                 Name = "X",
                 Path = @"C:\definitely\not\exists_12345.exe",
-                Trigger = new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) }
+                Triggers = new List<TriggerSpec> { new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) } }
             }));
             Assert.AreEqual(ErrorCode.InvalidPath, ex.Code);
         }

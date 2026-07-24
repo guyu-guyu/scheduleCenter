@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Win32.TaskScheduler;
@@ -16,7 +17,7 @@ namespace ScheduleCenter.Core.Tests
                 Name = name,
                 Path = TestExe,
                 Arguments = "/c exit 0",
-                Trigger = new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) }
+                Triggers = new List<TriggerSpec> { new TriggerSpec { Kind = TriggerKind.Daily, Time = new TimeSpan(9, 0, 0) } }
             };
         }
 
@@ -29,13 +30,13 @@ namespace ScheduleCenter.Core.Tests
             Service.Update(new TaskUpdate
             {
                 Name = name,
-                Trigger = new TriggerSpec { Kind = TriggerKind.Weekly, Time = new TimeSpan(10, 30, 0), Days = new[] { DayOfWeek.Wednesday } }
+                Triggers = new List<TriggerSpec> { new TriggerSpec { Kind = TriggerKind.Weekly, Time = new TimeSpan(10, 30, 0), Days = new[] { DayOfWeek.Wednesday } } }
             });
 
             TaskInfo info = Service.Get(name);
-            Assert.AreEqual(TriggerKind.Weekly, info.Trigger.Kind);
-            Assert.AreEqual(new TimeSpan(10, 30, 0), info.Trigger.Time);
-            CollectionAssert.AreEqual(new[] { DayOfWeek.Wednesday }, info.Trigger.Days);
+            Assert.AreEqual(TriggerKind.Weekly, info.Triggers[0].Kind);
+            Assert.AreEqual(new TimeSpan(10, 30, 0), info.Triggers[0].Time);
+            CollectionAssert.AreEqual(new[] { DayOfWeek.Wednesday }, info.Triggers[0].Days);
         }
 
         [TestMethod]
