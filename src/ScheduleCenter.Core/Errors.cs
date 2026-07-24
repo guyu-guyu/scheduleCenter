@@ -11,6 +11,9 @@ namespace ScheduleCenter.Core
         AccessDenied,
         HistoryDisabled,
         InvalidPath,
+        InvalidTriggerFormat,
+        InvalidEventSubscription,
+        XmlParseError,
         InternalError
     }
 
@@ -33,6 +36,9 @@ namespace ScheduleCenter.Core
                     case ErrorCode.InvalidArguments:
                     case ErrorCode.ConfirmRequired:
                     case ErrorCode.InvalidPath:
+                    case ErrorCode.InvalidTriggerFormat:
+                    case ErrorCode.InvalidEventSubscription:
+                    case ErrorCode.XmlParseError:
                         return 2;
                     case ErrorCode.AccessDenied:
                         return 3;
@@ -59,6 +65,9 @@ namespace ScheduleCenter.Core
                     case ErrorCode.AccessDenied: return "ACCESS_DENIED";
                     case ErrorCode.HistoryDisabled: return "HISTORY_DISABLED";
                     case ErrorCode.InvalidPath: return "INVALID_PATH";
+                    case ErrorCode.InvalidTriggerFormat: return "INVALID_TRIGGER_FORMAT";
+                    case ErrorCode.InvalidEventSubscription: return "INVALID_EVENT_SUBSCRIPTION";
+                    case ErrorCode.XmlParseError: return "XML_PARSE_ERROR";
                     default: return "INTERNAL_ERROR";
                 }
             }

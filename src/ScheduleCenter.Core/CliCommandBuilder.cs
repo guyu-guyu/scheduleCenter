@@ -15,7 +15,7 @@ namespace ScheduleCenter.Core
                 sb.Append(" --args \"").Append(task.Arguments).Append("\"");
             if (!string.IsNullOrEmpty(task.WorkingDirectory))
                 sb.Append(" --workdir \"").Append(task.WorkingDirectory).Append("\"");
-            AppendTriggerArgs(sb, task.Trigger);
+            AppendTriggerArgs(sb, task.Triggers != null && task.Triggers.Count > 0 ? task.Triggers[0] : null);
             if (task.RunAsSystem) sb.Append(" --run-as-system");
             if (task.Highest) sb.Append(" --highest");
             if (!string.IsNullOrEmpty(task.Description))

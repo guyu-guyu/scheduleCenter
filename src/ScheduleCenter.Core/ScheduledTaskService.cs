@@ -37,7 +37,10 @@ namespace ScheduleCenter.Core
                     td.Settings.Enabled = spec.Enabled;
                     td.Settings.StartWhenAvailable = spec.StartWhenAvailable;
                     ApplyPrincipal(td, spec.RunAsSystem, spec.Highest);
-                    td.Triggers.Add(BuildTrigger(spec.Trigger));
+                    foreach (TriggerSpec triggerSpec in spec.Triggers)
+                        td.Triggers.Add(BuildTrigger(triggerSpec));
+                    ApplyAdvancedSettings(td, spec);
+                    ApplyIdleSettingsFromTriggers(td, spec.Triggers);
                     td.Actions.Add(new ExecAction(spec.Path, spec.Arguments, spec.WorkingDirectory));
 
                     Task created = RegisterTask(folder, leaf, td, spec.RunAsSystem);
@@ -88,10 +91,7 @@ namespace ScheduleCenter.Core
         public TaskInfo Update(TaskUpdate update)
         {
             TaskValidator.ValidateName(update.Name);
-            if (update.Path != null && !File.Exists(update.Path))
-                throw new TaskServiceException(ErrorCode.InvalidPath, "程序路径不存在: " + update.Path);
-            if (update.Trigger != null)
-                TaskValidator.ValidateTrigger(update.Trigger);
+            TaskValidator.ValidateUpdate(update);
 
             return Run(delegate
             {
@@ -109,11 +109,14 @@ namespace ScheduleCenter.Core
                     }
                     if (update.Enabled.HasValue) td.Settings.Enabled = update.Enabled.Value;
                     if (update.StartWhenAvailable.HasValue) td.Settings.StartWhenAvailable = update.StartWhenAvailable.Value;
-                    if (update.Trigger != null)
+                    if (update.Triggers != null)
                     {
                         td.Triggers.Clear();
-                        td.Triggers.Add(BuildTrigger(update.Trigger));
+                        foreach (TriggerSpec triggerSpec in update.Triggers)
+                            td.Triggers.Add(BuildTrigger(triggerSpec));
+                        ApplyIdleSettingsFromTriggers(td, update.Triggers);
                     }
+                    ApplyAdvancedSettingsUpdate(td, update);
                     if (update.Path != null || update.Arguments != null || update.WorkingDirectory != null)
                     {
                         ExecAction exec = td.Actions.OfType<ExecAction>().FirstOrDefault();
@@ -191,6 +194,94 @@ namespace ScheduleCenter.Core
         public string BuildAddCommand(TaskInfo task)
         {
             return CliCommandBuilder.BuildAddCommand(task);
+        }
+
+        // ---------- V2: XML 导入导出 ----------
+
+        public string Export(string name)
+        {
+            TaskValidator.ValidateName(name);
+            return Run(delegate
+            {
+                using (var ts = new TaskService())
+                using (Task task = FindTaskOrThrow(ts, name))
+                {
+                    return task.Definition.XmlText;
+                }
+            });
+        }
+
+        public void ExportToFile(string name, string filePath)
+        {
+            string xml = Export(name);
+            File.WriteAllText(filePath, xml, System.Text.Encoding.UTF8);
+        }
+
+        public TaskInfo Import(string xml, string name, bool force)
+        {
+            TaskValidator.ValidateName(name);
+            if (string.IsNullOrWhiteSpace(xml))
+                throw new TaskServiceException(ErrorCode.InvalidArguments, "XML 内容不能为空");
+
+            return Run(delegate
+            {
+                TaskDefinition td;
+                try
+                {
+                    using (var ts = new TaskService())
+                    {
+                        td = ts.NewTask();
+                        td.XmlText = xml;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new TaskServiceException(ErrorCode.XmlParseError, "XML 解析失败: " + ex.Message, ex);
+                }
+
+                ValidateImportedDefinition(td);
+
+                using (var ts2 = new TaskService())
+                {
+                    if (!force)
+                    {
+                        using (Task existing = FindTask(ts2, name))
+                        {
+                            if (existing != null)
+                                throw new TaskServiceException(ErrorCode.TaskExists, "任务 '" + name + "' 已存在");
+                        }
+                    }
+
+                    string sub, leaf;
+                    SplitRelativeName(name, out sub, out leaf);
+                    TaskFolder folder = GetOrCreateFolder(ts2, sub);
+
+                    bool runAsSystem = IsSystemPrincipal(td);
+                    Task imported = RegisterTask(folder, leaf, td, runAsSystem);
+                    using (imported) { return ToTaskInfo(imported); }
+                }
+            });
+        }
+
+        public TaskInfo ImportFromFile(string filePath, string name, bool force)
+        {
+            if (!File.Exists(filePath))
+                throw new TaskServiceException(ErrorCode.InvalidPath, "文件不存在: " + filePath);
+            string xml = File.ReadAllText(filePath, System.Text.Encoding.UTF8);
+            return Import(xml, name, force);
+        }
+
+        private static void ValidateImportedDefinition(TaskDefinition td)
+        {
+            // 仅允许 ExecAction
+            for (int i = 0; i < td.Actions.Count; i++)
+            {
+                Microsoft.Win32.TaskScheduler.Action a = td.Actions[i];
+                if (!(a is ExecAction))
+                    throw new TaskServiceException(ErrorCode.InvalidArguments,
+                        "不支持的动作类型: " + a.GetType().Name + "（仅支持 ExecAction）");
+            }
+            // 触发器类型过滤在 ReadTriggers 时自动跳过未知类型，此处不报错
         }
 
         // ---------- 文件夹与查找 ----------
@@ -284,12 +375,95 @@ namespace ScheduleCenter.Core
                     return new BootTrigger();
                 case TriggerKind.Logon:
                     return new LogonTrigger();
+                case TriggerKind.Idle:
+                    return new IdleTrigger();
+                case TriggerKind.Event:
+                    return BuildEventTrigger(spec);
                 default:
                     throw new TaskServiceException(ErrorCode.InvalidArguments, "未知触发器类型");
             }
         }
 
-        internal static TriggerSpec ReadTrigger(Trigger t)
+        private static EventTrigger BuildEventTrigger(TriggerSpec spec)
+        {
+            var et = new EventTrigger();
+            if (!string.IsNullOrWhiteSpace(spec.EventSubscription))
+            {
+                et.Subscription = spec.EventSubscription;
+            }
+            else
+            {
+                et.Subscription = BuildEventSubscription(spec.EventLog, spec.EventSource, spec.EventId);
+            }
+            return et;
+        }
+
+        internal static string BuildEventSubscription(string log, string source, int? eventId)
+        {
+            string condition;
+            if (!string.IsNullOrEmpty(source))
+                condition = "*[System[Provider[@Name='" + source + "']";
+            else
+                condition = "*[System[";
+
+            if (eventId.HasValue)
+                condition += " and EventID=" + eventId.Value.ToString();
+
+            condition += "]]";
+
+            return "<QueryList><Query Id=\"0\" Path=\"" + log + "\"><Select Path=\"" + log + "\">" +
+                   condition + "</Select></Query></QueryList>";
+        }
+
+        private static void ApplyIdleSettingsFromTriggers(TaskDefinition td, IList<TriggerSpec> triggers)
+        {
+            if (triggers == null) return;
+            IdleSettingsSpec idleSpec = null;
+            foreach (TriggerSpec ts in triggers)
+            {
+                if (ts.Kind == TriggerKind.Idle && ts.IdleSettings != null)
+                {
+                    idleSpec = ts.IdleSettings;
+                    break;
+                }
+            }
+            if (idleSpec == null) return;
+
+            if (idleSpec.WaitTimeout.HasValue) td.Settings.IdleSettings.WaitTimeout = idleSpec.WaitTimeout.Value;
+            td.Settings.IdleSettings.StopOnIdleEnd = idleSpec.StopOnIdleEnd;
+            td.Settings.IdleSettings.RestartOnIdle = idleSpec.RestartOnIdle;
+        }
+
+        internal static IList<TriggerSpec> ReadTriggers(TaskDefinition def)
+        {
+            var list = new List<TriggerSpec>();
+            if (def == null || def.Triggers == null) return list;
+
+            IdleSettingsSpec idleSettings = null;
+            foreach (Trigger t in def.Triggers)
+            {
+                if (t.TriggerType == TaskTriggerType.Idle && idleSettings == null)
+                {
+                    idleSettings = new IdleSettingsSpec
+                    {
+                        WaitTimeout = def.Settings.IdleSettings.WaitTimeout,
+                        StopOnIdleEnd = def.Settings.IdleSettings.StopOnIdleEnd,
+                        RestartOnIdle = def.Settings.IdleSettings.RestartOnIdle
+                    };
+                }
+            }
+
+            foreach (Trigger t in def.Triggers)
+            {
+                TriggerSpec spec = ReadOneTrigger(t);
+                if (spec == null) continue;
+                if (spec.Kind == TriggerKind.Idle) spec.IdleSettings = idleSettings;
+                list.Add(spec);
+            }
+            return list;
+        }
+
+        internal static TriggerSpec ReadOneTrigger(Trigger t)
         {
             if (t == null) return null;
             switch (t.TriggerType)
@@ -308,6 +482,11 @@ namespace ScheduleCenter.Core
                     return new TriggerSpec { Kind = TriggerKind.Boot };
                 case TaskTriggerType.Logon:
                     return new TriggerSpec { Kind = TriggerKind.Logon };
+                case TaskTriggerType.Idle:
+                    return new TriggerSpec { Kind = TriggerKind.Idle };
+                case TaskTriggerType.Event:
+                    var e = (EventTrigger)t;
+                    return new TriggerSpec { Kind = TriggerKind.Event, EventSubscription = e.Subscription };
                 default:
                     return null;
             }
@@ -365,11 +544,37 @@ namespace ScheduleCenter.Core
                 State = task.State.ToString(),
                 RunAsSystem = IsSystemPrincipal(task.Definition),
                 Highest = task.Definition.Principal.RunLevel == TaskRunLevel.Highest,
-                Trigger = ReadTrigger(task.Definition.Triggers.Count > 0 ? task.Definition.Triggers[0] : null),
+                Triggers = ReadTriggers(task.Definition),
                 NextRunTime = task.NextRunTime == DateTime.MinValue ? (DateTime?)null : task.NextRunTime,
                 LastRunTime = task.LastRunTime == DateTime.MinValue ? (DateTime?)null : task.LastRunTime,
-                LastResult = task.LastTaskResult
+                LastResult = task.LastTaskResult,
+                ExecutionTimeLimit = ReadExecutionTimeLimit(task.Definition.Settings.ExecutionTimeLimit),
+                DisallowStartIfOnBatteries = task.Definition.Settings.DisallowStartIfOnBatteries,
+                StopIfGoingOnBatteries = task.Definition.Settings.StopIfGoingOnBatteries
             };
+        }
+
+        private static void ApplyAdvancedSettings(TaskDefinition td, TaskSpec spec)
+        {
+            td.Settings.ExecutionTimeLimit = spec.ExecutionTimeLimit ?? TimeSpan.Zero;
+            td.Settings.DisallowStartIfOnBatteries = spec.DisallowStartIfOnBatteries;
+            td.Settings.StopIfGoingOnBatteries = spec.StopIfGoingOnBatteries;
+        }
+
+        private static void ApplyAdvancedSettingsUpdate(TaskDefinition td, TaskUpdate update)
+        {
+            if (update.ExecutionTimeLimit.HasValue)
+                td.Settings.ExecutionTimeLimit = update.ExecutionTimeLimit.Value;
+            if (update.DisallowStartIfOnBatteries.HasValue)
+                td.Settings.DisallowStartIfOnBatteries = update.DisallowStartIfOnBatteries.Value;
+            if (update.StopIfGoingOnBatteries.HasValue)
+                td.Settings.StopIfGoingOnBatteries = update.StopIfGoingOnBatteries.Value;
+        }
+
+        private static TimeSpan? ReadExecutionTimeLimit(TimeSpan settingsValue)
+        {
+            // TaskScheduler 库约定 TimeSpan.Zero 表示无限制
+            return settingsValue == TimeSpan.Zero ? (TimeSpan?)null : settingsValue;
         }
 
         private static bool IsSystemPrincipal(TaskDefinition td)

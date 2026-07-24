@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace ScheduleCenter.Core
@@ -35,7 +36,33 @@ namespace ScheduleCenter.Core
                 throw new TaskServiceException(ErrorCode.InvalidArguments, "程序路径不能为空");
             if (!File.Exists(spec.Path))
                 throw new TaskServiceException(ErrorCode.InvalidPath, "程序路径不存在: " + spec.Path);
-            ValidateTrigger(spec.Trigger);
+            if (spec.Triggers == null || spec.Triggers.Count == 0)
+                throw new TaskServiceException(ErrorCode.InvalidArguments, "至少需要一个触发器");
+            foreach (TriggerSpec t in spec.Triggers)
+                ValidateTrigger(t);
+            ValidateExecutionTimeLimit(spec.ExecutionTimeLimit);
+        }
+
+        public static void ValidateUpdate(TaskUpdate update)
+        {
+            ValidateName(update.Name);
+            if (update.Path != null && !File.Exists(update.Path))
+                throw new TaskServiceException(ErrorCode.InvalidPath, "程序路径不存在: " + update.Path);
+            if (update.Triggers != null)
+            {
+                if (update.Triggers.Count == 0)
+                    throw new TaskServiceException(ErrorCode.InvalidArguments, "触发器列表不能为空");
+                foreach (TriggerSpec t in update.Triggers)
+                    ValidateTrigger(t);
+            }
+            ValidateExecutionTimeLimit(update.ExecutionTimeLimit);
+
+            if (update.Path == null && update.Arguments == null && update.WorkingDirectory == null &&
+                update.Description == null && update.Triggers == null && update.RunAsSystem == null &&
+                update.Highest == null && update.Enabled == null && update.StartWhenAvailable == null &&
+                update.ExecutionTimeLimit == null && update.DisallowStartIfOnBatteries == null &&
+                update.StopIfGoingOnBatteries == null)
+                throw new TaskServiceException(ErrorCode.InvalidArguments, "update 命令至少需要一个要修改的选项");
         }
 
         public static void ValidateTrigger(TriggerSpec t)
@@ -67,8 +94,20 @@ namespace ScheduleCenter.Core
                     break;
                 case TriggerKind.Boot:
                 case TriggerKind.Logon:
+                case TriggerKind.Idle:
+                    break;
+                case TriggerKind.Event:
+                    if (string.IsNullOrWhiteSpace(t.EventSubscription) && string.IsNullOrWhiteSpace(t.EventLog))
+                        throw new TaskServiceException(ErrorCode.InvalidEventSubscription,
+                            "event 触发器需要 --event-log 或 --event-subscription");
                     break;
             }
+        }
+
+        public static void ValidateExecutionTimeLimit(TimeSpan? limit)
+        {
+            if (limit.HasValue && limit.Value < TimeSpan.Zero)
+                throw new TaskServiceException(ErrorCode.InvalidArguments, "执行时间限制不能为负数");
         }
 
         private static void RequireTime(TriggerSpec t, string kindName)

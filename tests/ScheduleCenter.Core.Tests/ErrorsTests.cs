@@ -31,5 +31,21 @@ namespace ScheduleCenter.Core.Tests
             Assert.AreEqual("INVALID_PATH", new TaskServiceException(ErrorCode.InvalidPath, "x").CodeName);
             Assert.AreEqual("INTERNAL_ERROR", new TaskServiceException(ErrorCode.InternalError, "x").CodeName);
         }
+
+        [TestMethod]
+        public void V2_ExitCode_MapsCorrectly()
+        {
+            Assert.AreEqual(2, new TaskServiceException(ErrorCode.InvalidTriggerFormat, "x").ExitCode);
+            Assert.AreEqual(2, new TaskServiceException(ErrorCode.InvalidEventSubscription, "x").ExitCode);
+            Assert.AreEqual(2, new TaskServiceException(ErrorCode.XmlParseError, "x").ExitCode);
+        }
+
+        [TestMethod]
+        public void V2_CodeName_MatchesCliContract()
+        {
+            Assert.AreEqual("INVALID_TRIGGER_FORMAT", new TaskServiceException(ErrorCode.InvalidTriggerFormat, "x").CodeName);
+            Assert.AreEqual("INVALID_EVENT_SUBSCRIPTION", new TaskServiceException(ErrorCode.InvalidEventSubscription, "x").CodeName);
+            Assert.AreEqual("XML_PARSE_ERROR", new TaskServiceException(ErrorCode.XmlParseError, "x").CodeName);
+        }
     }
 }
