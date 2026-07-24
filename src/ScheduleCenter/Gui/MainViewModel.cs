@@ -65,6 +65,8 @@ namespace ScheduleCenter.Gui
         public ICommand RunCommand { get; private set; }
         public ICommand CopyCliCommand { get; private set; }
         public ICommand RefreshHistoryCommand { get; private set; }
+        public ICommand ExportCommand { get; private set; }
+        public ICommand ImportCommand { get; private set; }
 
         public MainViewModel()
         {
@@ -80,6 +82,8 @@ namespace ScheduleCenter.Gui
             RunCommand = new RelayCommand(RunTask, () => SelectedTask != null);
             CopyCliCommand = new RelayCommand(CopyCli, () => SelectedTask != null);
             RefreshHistoryCommand = new RelayCommand(LoadHistory, () => SelectedTask != null);
+            ExportCommand = new RelayCommand(ExportTask, () => SelectedTask != null);
+            ImportCommand = new RelayCommand(ImportTask);
         }
 
         internal void Refresh()
@@ -230,6 +234,57 @@ namespace ScheduleCenter.Gui
                 TaskInfo current = Service.Get(SelectedTask.Info.RelativeName);
                 System.Windows.Clipboard.SetText(Service.BuildAddCommand(current));
                 StatusText = "CLI 命令已复制到剪贴板";
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void ExportTask()
+        {
+            if (SelectedTask == null) return;
+            string name = SelectedTask.Info.RelativeName;
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = name.Replace('\\', '_') + ".xml",
+                Filter = "任务计划 XML (*.xml)|*.xml",
+                Title = "导出任务"
+            };
+            if (dlg.ShowDialog() != true) return;
+            try
+            {
+                Service.ExportToFile(name, dlg.FileName);
+                StatusText = "已导出到: " + dlg.FileName;
+            }
+            catch (TaskServiceException ex)
+            {
+                ShowError(ex);
+            }
+        }
+
+        internal void ImportTask()
+        {
+            var openDlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "任务计划 XML (*.xml)|*.xml",
+                Title = "导入任务"
+            };
+            if (openDlg.ShowDialog() != true) return;
+
+            string suggestedName = System.IO.Path.GetFileNameWithoutExtension(openDlg.FileName);
+            var inputDlg = new InputDialog("导入任务", "导入到名称（可用 \\ 表示子文件夹）:", suggestedName);
+            inputDlg.Owner = System.Windows.Application.Current.MainWindow;
+            if (inputDlg.ShowDialog() != true) return;
+            string newName = inputDlg.InputText;
+            if (string.IsNullOrWhiteSpace(newName)) return;
+
+            bool force = inputDlg.OverwriteExisting;
+            try
+            {
+                Service.ImportFromFile(openDlg.FileName, newName, force);
+                Refresh();
+                StatusText = "已导入: " + newName;
             }
             catch (TaskServiceException ex)
             {

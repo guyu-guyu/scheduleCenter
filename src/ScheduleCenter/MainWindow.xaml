@@ -13,6 +13,8 @@
         <ToolBarTray Grid.Row="0">
             <ToolBar>
                 <Button Content="新建任务" Command="{Binding NewCommand}" Padding="8,2"/>
+                <Button Content="导入" Command="{Binding ImportCommand}" Padding="8,2"/>
+                <Button Content="导出" Command="{Binding ExportCommand}" Padding="8,2"/>
                 <Button Content="刷新" Command="{Binding RefreshCommand}" Padding="8,2"/>
                 <Separator/>
                 <TextBlock Text=" 搜索: " VerticalAlignment="Center"/>
@@ -59,6 +61,7 @@
                             <MenuItem Header="删除" Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                             <MenuItem Header="启用/禁用" Command="{Binding DataContext.ToggleEnabledCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                             <MenuItem Header="立即运行" Command="{Binding DataContext.RunCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                            <MenuItem Header="导出..." Command="{Binding DataContext.ExportCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                             <MenuItem Header="复制 CLI 命令" Command="{Binding DataContext.CopyCliCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                         </ContextMenu>
                     </DataGrid.ContextMenu>
