@@ -1,0 +1,320 @@
+{
+  "help": {
+    "summary": "ScheduleCenter - Windows 任务计划管理工具（单 exe 双模式：无参数启动 GUI；带参数进入 CLI）。所有任务都位于任务计划程序的 \\ScheduleCenter\\ 文件夹下，系统自带任务对工具完全不可见、不可操作。需要管理员权限运行。",
+    "usage": "ScheduleCenter <command> [options]",
+    "hintForAgents": "Agent 调用提示：运行 'ScheduleCenter manifest' 获取机器可读的完整 CLI 清单（JSON），其中包含每个命令的全部参数、类型、是否必填、默认值、调用示例，以及退出码与错误码表。所有 CLI 成功输出为单行 JSON 到 stdout（退出码 0），失败输出为 JSON 到 stderr（退出码非 0）。建议 agent 先调用 manifest 解析清单，再据此构造其他命令。"
+  },
+  "manifest": {
+    "version": "2.0",
+    "program": "ScheduleCenter.exe",
+    "description": "Windows 任务计划管理 CLI。通过 dahall TaskScheduler 库调用 Windows Task Scheduler 2.0 COM API，操作范围限定在 \\ScheduleCenter\\ 文件夹下。支持 8 种触发器、多触发器组合、高级条件、任务 XML 导入导出。",
+    "modes": {
+      "gui": "无参数启动 → WPF GUI 管理界面",
+      "cli": "带参数启动 → CLI 模式，输出 JSON 到 stdout/stderr"
+    },
+    "nameScope": "所有 --name 均相对于 \\ScheduleCenter\\ 文件夹；支持子文件夹路径，如 --name \"MyApp\\Backup\" 对应 \\ScheduleCenter\\MyApp\\Backup。",
+    "outputConvention": {
+      "success": "单行 JSON 到 stdout，退出码 0",
+      "failure": "JSON 到 stderr，退出码非 0",
+      "timeFormat": "本地时间 ISO 8601",
+      "jsonFieldCase": "camelCase"
+    },
+    "commands": {
+      "add": {
+        "description": "添加新任务到 \\ScheduleCenter\\ 文件夹下。",
+        "syntax": "ScheduleCenter add --name <名称> --path <程序路径> --trigger <类型> [选项]",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "任务名称，可含子路径如 MyApp\\Backup" },
+          "path": { "type": "string", "required": true, "description": "可执行文件完整路径，必须存在" },
+          "args": { "type": "string", "required": false, "description": "命令行参数" },
+          "workdir": { "type": "string", "required": false, "description": "工作目录" },
+          "description": { "type": "string", "required": false, "description": "任务描述" },
+          "trigger": { "type": "string", "required": "conditional", "description": "单触发器类型。与 --triggers-json / --triggers-file 互斥。取值：once|daily|weekly|monthly|boot|logon|idle|event" },
+          "time": { "type": "string", "required": "conditional", "description": "HH:mm 格式时间，once/daily/weekly/monthly 必填" },
+          "date": { "type": "string", "required": "conditional", "description": "yyyy-MM-dd 格式日期，once 必填且不能为过去" },
+          "days": { "type": "string", "required": "conditional", "description": "星期列表，逗号分隔，weekly 必填。取值：MON,TUE,WED,THU,FRI,SAT,SUN" },
+          "day-of-month": { "type": "integer", "required": "conditional", "description": "1-31，monthly 必填" },
+          "triggers-json": { "type": "string", "required": "conditional", "description": "多触发器 JSON 数组，与 --trigger / --triggers-file 互斥。格式见 triggersSchema" },
+          "triggers-file": { "type": "string", "required": "conditional", "description": "多触发器 JSON 文件路径，与 --trigger / --triggers-json 互斥" },
+          "idle-wait": { "type": "integer", "required": false, "description": "空闲等待分钟数，仅 --trigger idle 时可用" },
+          "idle-stop-on-end": { "type": "flag", "required": false, "description": "空闲结束时停止任务，仅 --trigger idle 时可用" },
+          "idle-restart": { "type": "flag", "required": false, "description": "空闲中断后重新计时，仅 --trigger idle 时可用" },
+          "event-log": { "type": "string", "required": "conditional", "description": "事件日志名（如 System），仅 --trigger event 时可用，与 --event-subscription 互斥" },
+          "event-source": { "type": "string", "required": false, "description": "事件源名，必须与 --event-log 搭配" },
+          "event-id": { "type": "integer", "required": false, "description": "事件 ID，必须与 --event-log 搭配" },
+          "event-subscription": { "type": "string", "required": "conditional", "description": "完整 XPath 订阅，仅 --trigger event 时可用，与 --event-log 互斥" },
+          "execution-time-limit": { "type": "integer", "required": false, "description": "执行时间限制分钟数，0=无限制" },
+          "no-start-on-battery": { "type": "flag", "required": false, "description": "电池供电时不启动" },
+          "stop-on-battery": { "type": "flag", "required": false, "description": "切换到电池时停止任务" },
+          "run-as-system": { "type": "flag", "required": false, "description": "以 SYSTEM 账户运行" },
+          "highest": { "type": "flag", "required": false, "description": "使用最高权限运行" },
+          "enabled": { "type": "flag", "required": false, "description": "启用任务（默认启用）" },
+          "start-when-available": { "type": "flag", "required": false, "description": "错过启动时间后允许之后启动" }
+        },
+        "examples": [
+          "ScheduleCenter add --name Backup --path C:\\app.exe --trigger daily --time 09:00",
+          "ScheduleCenter add --name Backup --path C:\\app.exe --trigger weekly --time 09:00 --days MON,FRI",
+          "ScheduleCenter add --name Backup --path C:\\app.exe --triggers-json \"[{\\\"kind\\\":\\\"daily\\\",\\\"time\\\":\\\"09:00\\\"},{\\\"kind\\\":\\\"boot\\\"}]\"",
+          "ScheduleCenter add --name IdleTask --path C:\\app.exe --trigger idle --idle-wait 5 --idle-stop-on-end",
+          "ScheduleCenter add --name OnEvent --path C:\\app.exe --trigger event --event-log System --event-id 42",
+          "ScheduleCenter add --name Safe --path C:\\app.exe --trigger daily --time 09:00 --execution-time-limit 30 --no-start-on-battery"
+        ]
+      },
+      "update": {
+        "description": "修改已有任务。仅提供要修改的选项，未提供的保持不变。",
+        "syntax": "ScheduleCenter update --name <名称> [要修改的选项]",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "要修改的任务名称" },
+          "path": { "type": "string", "required": false, "description": "新的程序路径，必须存在" },
+          "args": { "type": "string", "required": false, "description": "新的命令行参数" },
+          "workdir": { "type": "string", "required": false, "description": "新的工作目录" },
+          "description": { "type": "string", "required": false, "description": "新的描述" },
+          "trigger": { "type": "string", "required": false, "description": "替换单触发器，与 --triggers-json / --triggers-file 互斥" },
+          "time": { "type": "string", "required": false, "description": "HH:mm 时间" },
+          "date": { "type": "string", "required": false, "description": "yyyy-MM-dd 日期" },
+          "days": { "type": "string", "required": false, "description": "星期列表" },
+          "day-of-month": { "type": "integer", "required": false, "description": "1-31" },
+          "triggers-json": { "type": "string", "required": false, "description": "替换为多触发器 JSON 数组" },
+          "triggers-file": { "type": "string", "required": false, "description": "替换为多触发器 JSON 文件" },
+          "idle-wait": { "type": "integer", "required": false, "description": "空闲等待分钟" },
+          "idle-stop-on-end": { "type": "flag", "required": false, "description": "空闲结束停止" },
+          "idle-restart": { "type": "flag", "required": false, "description": "空闲中断重新计时" },
+          "event-log": { "type": "string", "required": false, "description": "事件日志名" },
+          "event-source": { "type": "string", "required": false, "description": "事件源" },
+          "event-id": { "type": "integer", "required": false, "description": "事件 ID" },
+          "event-subscription": { "type": "string", "required": false, "description": "完整 XPath 订阅" },
+          "execution-time-limit": { "type": "integer", "required": false, "description": "执行时间限制分钟，0=无限" },
+          "no-start-on-battery": { "type": "flag", "required": false, "description": "电池供电不启动" },
+          "stop-on-battery": { "type": "flag", "required": false, "description": "切电池时停止" },
+          "run-as-system": { "type": "flag", "required": false, "description": "以 SYSTEM 运行" },
+          "highest": { "type": "flag", "required": false, "description": "最高权限" },
+          "enabled": { "type": "flag", "required": false, "description": "启用" }
+        },
+        "examples": [
+          "ScheduleCenter update --name Backup --time 10:00",
+          "ScheduleCenter update --name Backup --execution-time-limit 60 --no-start-on-battery"
+        ]
+      },
+      "delete": {
+        "description": "删除任务。不带 --force 时不执行删除，返回 CONFIRM_REQUIRED 错误。",
+        "syntax": "ScheduleCenter delete --name <名称> [--force]",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "要删除的任务名称" },
+          "force": { "type": "flag", "required": false, "description": "确认删除，必填才能真删除" }
+        },
+        "examples": [
+          "ScheduleCenter delete --name Backup --force"
+        ]
+      },
+      "get": {
+        "description": "查询单个任务详情。",
+        "syntax": "ScheduleCenter get --name <名称>",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "任务名称" }
+        },
+        "examples": [
+          "ScheduleCenter get --name Backup"
+        ]
+      },
+      "list": {
+        "description": "列出 \\ScheduleCenter\\ 文件夹下所有任务，可选通配符过滤。",
+        "syntax": "ScheduleCenter list [--filter <通配符>]",
+        "options": {
+          "filter": { "type": "string", "required": false, "description": "通配符过滤（* 和 ?），匹配任务名" }
+        },
+        "examples": [
+          "ScheduleCenter list",
+          "ScheduleCenter list --filter Backup*"
+        ]
+      },
+      "enable": {
+        "description": "启用任务。",
+        "syntax": "ScheduleCenter enable --name <名称>",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "任务名称" }
+        },
+        "examples": [
+          "ScheduleCenter enable --name Backup"
+        ]
+      },
+      "disable": {
+        "description": "禁用任务。",
+        "syntax": "ScheduleCenter disable --name <名称>",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "任务名称" }
+        },
+        "examples": [
+          "ScheduleCenter disable --name Backup"
+        ]
+      },
+      "run": {
+        "description": "立即触发运行任务（异步，不等执行完成）。",
+        "syntax": "ScheduleCenter run --name <名称>",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "任务名称" }
+        },
+        "examples": [
+          "ScheduleCenter run --name Backup"
+        ]
+      },
+      "history": {
+        "description": "查询任务运行历史。数据来源：Microsoft-Windows-TaskScheduler/Operational 事件日志。若系统未启用任务历史记录，返回 HISTORY_DISABLED。",
+        "syntax": "ScheduleCenter history --name <名称> [--last <N>] [--errors-only]",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "任务名称" },
+          "last": { "type": "integer", "required": false, "description": "只返回最近 N 条，必须 >0" },
+          "errors-only": { "type": "flag", "required": false, "description": "只返回失败事件" }
+        },
+        "examples": [
+          "ScheduleCenter history --name Backup --last 20",
+          "ScheduleCenter history --name Backup --errors-only"
+        ]
+      },
+      "export": {
+        "description": "导出任务为 Windows 任务计划标准 XML。不带 --output 时将 XML 写到 stdout；带 --output 写入文件。",
+        "syntax": "ScheduleCenter export --name <名称> [--output <文件路径>]",
+        "options": {
+          "name": { "type": "string", "required": true, "description": "要导出的任务名称" },
+          "output": { "type": "string", "required": false, "description": "输出文件路径；省略则 XML 写到 stdout" }
+        },
+        "examples": [
+          "ScheduleCenter export --name Backup --output C:\\backup.xml",
+          "ScheduleCenter export --name Backup > backup.xml"
+        ]
+      },
+      "import": {
+        "description": "从 XML 文件导入任务。--name 必填（不自动从 XML 推断）。任务已存在时需 --force 才覆盖。",
+        "syntax": "ScheduleCenter import --file <XML 文件> --name <名称> [--force]",
+        "options": {
+          "file": { "type": "string", "required": true, "description": "要导入的 XML 文件路径" },
+          "name": { "type": "string", "required": true, "description": "导入后的任务名称，可含子路径" },
+          "force": { "type": "flag", "required": false, "description": "覆盖同名任务" }
+        },
+        "examples": [
+          "ScheduleCenter import --file C:\\backup.xml --name Restored",
+          "ScheduleCenter import --file C:\\backup.xml --name Restored --force"
+        ]
+      },
+      "help": {
+        "description": "显示帮助文本（人友好）。h 是别名。",
+        "syntax": "ScheduleCenter help | ScheduleCenter h",
+        "options": {},
+        "examples": [
+          "ScheduleCenter help",
+          "ScheduleCenter h"
+        ]
+      },
+      "h": {
+        "description": "help 命令的别名。",
+        "syntax": "ScheduleCenter h",
+        "options": {},
+        "examples": [
+          "ScheduleCenter h"
+        ]
+      },
+      "manifest": {
+        "description": "输出机器可读的完整 CLI 清单（本文档）。Agent 自动化调用应优先使用此命令获取所有命令的参数详情、类型、示例与错误码表。",
+        "syntax": "ScheduleCenter manifest",
+        "options": {},
+        "examples": [
+          "ScheduleCenter manifest"
+        ]
+      }
+    },
+    "triggerTypes": {
+      "once": { "description": "一次性触发", "requiredParams": ["time", "date"], "optionalParams": [] },
+      "daily": { "description": "每日触发", "requiredParams": ["time"], "optionalParams": [] },
+      "weekly": { "description": "每周触发", "requiredParams": ["time", "days"], "optionalParams": [] },
+      "monthly": { "description": "每月触发", "requiredParams": ["time", "day-of-month"], "optionalParams": [] },
+      "boot": { "description": "开机时触发", "requiredParams": [], "optionalParams": [] },
+      "logon": { "description": "登录时触发", "requiredParams": [], "optionalParams": [] },
+      "idle": { "description": "系统空闲时触发", "requiredParams": [], "optionalParams": ["idle-wait", "idle-stop-on-end", "idle-restart"] },
+      "event": { "description": "Windows 事件触发，需 event-log（简化参数）或 event-subscription（完整 XPath）", "requiredParams": ["event-log 或 event-subscription"], "optionalParams": ["event-source", "event-id"] }
+    },
+    "triggersSchema": {
+      "description": "--triggers-json / --triggers-file 的 JSON 数组元素结构",
+      "fields": {
+        "kind": { "type": "string", "required": true, "description": "触发器类型，同 triggerTypes 键名" },
+        "time": { "type": "string", "required": false, "description": "HH:mm" },
+        "date": { "type": "string", "required": false, "description": "yyyy-MM-dd" },
+        "days": { "type": "string[]", "required": false, "description": "星期数组，如 [\"MON\",\"FRI\"]" },
+        "dayOfMonth": { "type": "integer", "required": false, "description": "1-31" },
+        "idleSettings": {
+          "type": "object",
+          "required": false,
+          "fields": {
+            "waitTimeout": { "type": "string", "required": false, "description": "TimeSpan，如 00:05:00" },
+            "stopOnIdleEnd": { "type": "boolean", "required": false },
+            "restartOnIdle": { "type": "boolean", "required": false }
+          }
+        },
+        "eventSubscription": { "type": "string", "required": false, "description": "完整 XPath 订阅" },
+        "eventLog": { "type": "string", "required": false, "description": "事件日志名" },
+        "eventSource": { "type": "string", "required": false, "description": "事件源" },
+        "eventId": { "type": "integer", "required": false, "description": "事件 ID" }
+      },
+      "example": "[{\"kind\":\"daily\",\"time\":\"09:00\"},{\"kind\":\"weekly\",\"time\":\"10:00\",\"days\":[\"MON\"]},{\"kind\":\"event\",\"eventLog\":\"System\",\"eventId\":42}]"
+    },
+    "exitCodes": {
+      "0": "成功",
+      "1": "一般错误（INTERNAL_ERROR / HISTORY_DISABLED）",
+      "2": "参数错误（INVALID_ARGUMENTS / CONFIRM_REQUIRED / INVALID_PATH / INVALID_TRIGGER_FORMAT / INVALID_EVENT_SUBSCRIPTION / XML_PARSE_ERROR）",
+      "3": "权限不足（ACCESS_DENIED）",
+      "4": "任务不存在（TASK_NOT_FOUND）",
+      "5": "任务已存在（TASK_EXISTS）"
+    },
+    "errorCodes": {
+      "INVALID_ARGUMENTS": { "exitCode": 2, "description": "缺必需参数、格式错误、参数组合非法" },
+      "CONFIRM_REQUIRED": { "exitCode": 2, "description": "delete 未带 --force" },
+      "INVALID_PATH": { "exitCode": 2, "description": "--path 指向的可执行文件不存在，或导入文件不存在" },
+      "INVALID_TRIGGER_FORMAT": { "exitCode": 2, "description": "--triggers-json 解析失败或触发器结构非法" },
+      "INVALID_EVENT_SUBSCRIPTION": { "exitCode": 2, "description": "event 触发器缺少 --event-log 或 --event-subscription" },
+      "XML_PARSE_ERROR": { "exitCode": 2, "description": "导入的 XML 解析失败" },
+      "ACCESS_DENIED": { "exitCode": 3, "description": "非管理员运行或权限不足" },
+      "TASK_NOT_FOUND": { "exitCode": 4, "description": "在 \\ScheduleCenter\\ 内找不到任务" },
+      "TASK_EXISTS": { "exitCode": 5, "description": "add 同名任务已存在，或 import 未带 --force 且同名任务存在" },
+      "HISTORY_DISABLED": { "exitCode": 1, "description": "系统未启用任务历史记录日志" },
+      "INTERNAL_ERROR": { "exitCode": 1, "description": "其他未分类异常，message 含原始异常信息" }
+    },
+    "mutualExclusionRules": [
+      "--trigger / --triggers-json / --triggers-file 三者互斥，只能指定一个",
+      "--event-log 与 --event-subscription 互斥",
+      "--event-source / --event-id 必须与 --event-log 搭配使用",
+      "--idle-* 参数仅在 --trigger idle 时可用（triggers-json 路径不在此校验）"
+    ],
+    "successOutputShape": {
+      "description": "成功时 stdout 输出单行 JSON，外层结构如下（具体字段因命令而异）",
+      "fields": {
+        "success": "true",
+        "command": "当前命令名",
+        "task": "add/update/get/import 返回的 TaskInfo DTO（见 taskDtoShape）",
+        "tasks": "list 返回的 TaskInfo DTO 数组",
+        "name": "delete/enable/disable/run/export/import 返回的任务名",
+        "path": "export 带 --output 时返回的文件路径",
+        "events": "history 返回的事件数组"
+      }
+    },
+    "taskDtoShape": {
+      "description": "TaskInfo JSON DTO 字段",
+      "fields": {
+        "name": "相对 \\ScheduleCenter\\ 的名称",
+        "folder": "完整文件夹路径",
+        "path": "可执行文件路径",
+        "args": "命令行参数",
+        "workdir": "工作目录",
+        "description": "任务描述",
+        "enabled": "是否启用",
+        "state": "任务状态（Unknown/Disabled/Queued/Ready/Running）",
+        "runAsSystem": "是否以 SYSTEM 运行",
+        "highest": "是否最高权限",
+        "triggers": "触发器数组，见 triggersSchema",
+        "nextRunTime": "下次运行时间（ISO 8601 或 null）",
+        "lastRunTime": "上次运行时间（ISO 8601 或 null）",
+        "lastResult": "上次结果码（0=成功）",
+        "executionTimeLimit": "执行时间限制（hh:mm:ss 或 null）",
+        "disallowStartIfOnBatteries": "电池供电时不启动",
+        "stopIfGoingOnBatteries": "切换到电池时停止"
+      }
+    }
+  }
+}

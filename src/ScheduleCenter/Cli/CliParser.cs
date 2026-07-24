@@ -39,7 +39,12 @@ namespace ScheduleCenter.Cli
     public static class CliParser
     {
         private static readonly HashSet<string> Commands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "add", "update", "delete", "get", "list", "enable", "disable", "run", "history", "export", "import" };
+        { "add", "update", "delete", "get", "list", "enable", "disable", "run", "history", "export", "import",
+          "help", "h", "manifest" };
+
+        // 元命令：不带业务参数，跳过互斥校验
+        private static readonly HashSet<string> MetaCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "help", "h", "manifest" };
 
         private static readonly HashSet<string> Flags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         { "force", "run-as-system", "highest", "enabled", "start-when-available", "errors-only",
@@ -88,7 +93,9 @@ namespace ScheduleCenter.Cli
                     throw new TaskServiceException(ErrorCode.InvalidArguments, "未知选项 --" + key);
                 }
             }
-            ValidateMutualExclusion(result);
+            // 元命令（help/h/manifest）跳过业务参数互斥校验
+            if (!MetaCommands.Contains(command))
+                ValidateMutualExclusion(result);
             return result;
         }
 
@@ -133,10 +140,17 @@ namespace ScheduleCenter.Cli
 
         public static string Usage()
         {
-            return "用法: ScheduleCenter <add|update|delete|get|list|enable|disable|run|history|export|import> [选项]\n" +
-                   "示例: ScheduleCenter add --name Backup --path C:\\app.exe --trigger daily --time 09:00\n" +
-                   "      ScheduleCenter add --name Backup --path C:\\app.exe --triggers-json '[{\"kind\":\"daily\",\"time\":\"09:00\"}]'\n" +
-                   "      ScheduleCenter export --name Backup --output C:\\backup.xml";
+            try
+            {
+                return ManifestProvider.RenderHelpText();
+            }
+            catch
+            {
+                // 嵌入资源加载失败时兜底，保证工具仍可用
+                return "用法: ScheduleCenter <add|update|delete|get|list|enable|disable|run|history|export|import|help|manifest> [选项]\n" +
+                       "运行 'ScheduleCenter help' 查看完整帮助；运行 'ScheduleCenter manifest' 获取机器可读的 CLI 清单。\n" +
+                       "示例: ScheduleCenter add --name Backup --path C:\\app.exe --trigger daily --time 09:00";
+            }
         }
     }
 }

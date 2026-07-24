@@ -17,4 +17,9 @@
   <ItemGroup>
     <ProjectReference Include="..\ScheduleCenter.Core\ScheduleCenter.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Cli\cli-manifest.json">
+      <LogicalName>ScheduleCenter.Cli.cli-manifest.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>

@@ -117,6 +117,22 @@ namespace ScheduleCenter.Cli
                         OutputWriter.Success(new { success = true, command, name, task = TaskDto.From(imported) });
                         return 0;
                     }
+                    case "help":
+                    case "h":
+                    {
+                        // 人友好帮助文本，输出到 stdout，退出码 0
+                        Console.Out.Write(ManifestProvider.RenderHelpText());
+                        Console.Out.Flush();
+                        return 0;
+                    }
+                    case "manifest":
+                    {
+                        // 机器可读的完整 CLI 清单（JSON），供 agent 解析
+                        Console.Out.Write(ManifestProvider.RenderManifestJson());
+                        Console.Out.WriteLine();
+                        Console.Out.Flush();
+                        return 0;
+                    }
                     default:
                         throw new TaskServiceException(ErrorCode.InvalidArguments, CliParser.Usage());
                 }
