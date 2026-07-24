@@ -91,6 +91,32 @@ namespace ScheduleCenter.Cli
                         });
                         return 0;
                     }
+                    case "export":
+                    {
+                        string name = parsed.Require("name");
+                        string outputPath = parsed.Get("output");
+                        if (outputPath == null)
+                        {
+                            string xml = service.Export(name);
+                            Console.Out.Write(xml);
+                            Console.Out.Flush();
+                        }
+                        else
+                        {
+                            service.ExportToFile(name, outputPath);
+                            OutputWriter.Success(new { success = true, command, name, path = outputPath });
+                        }
+                        return 0;
+                    }
+                    case "import":
+                    {
+                        string file = parsed.Require("file");
+                        string name = parsed.Require("name");
+                        bool force = parsed.Has("force");
+                        TaskInfo imported = service.ImportFromFile(file, name, force);
+                        OutputWriter.Success(new { success = true, command, name, task = TaskDto.From(imported) });
+                        return 0;
+                    }
                     default:
                         throw new TaskServiceException(ErrorCode.InvalidArguments, CliParser.Usage());
                 }

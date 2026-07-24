@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ScheduleCenter.Core;
 
@@ -20,10 +21,13 @@ namespace ScheduleCenter.Cli
                 state = t.State,
                 runAsSystem = t.RunAsSystem,
                 highest = t.Highest,
-                trigger = TriggerDto(t.Trigger),
+                triggers = (t.Triggers == null ? new List<object>() : t.Triggers.Select(TriggerDto).ToList()),
                 nextRunTime = t.NextRunTime,
                 lastRunTime = t.LastRunTime,
-                lastResult = t.LastResult
+                lastResult = t.LastResult,
+                executionTimeLimit = FmtTimeSpan(t.ExecutionTimeLimit),
+                disallowStartIfOnBatteries = t.DisallowStartIfOnBatteries,
+                stopIfGoingOnBatteries = t.StopIfGoingOnBatteries
             };
         }
 
@@ -35,26 +39,53 @@ namespace ScheduleCenter.Cli
                 case TriggerKind.Once:
                     return new
                     {
-                        type = "once",
+                        kind = "once",
                         date = spec.Date.HasValue ? spec.Date.Value.ToString("yyyy-MM-dd") : null,
                         time = FmtTime(spec.Time)
                     };
                 case TriggerKind.Daily:
-                    return new { type = "daily", time = FmtTime(spec.Time) };
+                    return new { kind = "daily", time = FmtTime(spec.Time) };
                 case TriggerKind.Weekly:
-                    return new { type = "weekly", time = FmtTime(spec.Time), days = spec.Days == null ? null : spec.Days.Select(DayCode).ToArray() };
+                    return new { kind = "weekly", time = FmtTime(spec.Time), days = spec.Days == null ? null : spec.Days.Select(DayCode).ToArray() };
                 case TriggerKind.Monthly:
-                    return new { type = "monthly", time = FmtTime(spec.Time), dayOfMonth = spec.DayOfMonth };
+                    return new { kind = "monthly", time = FmtTime(spec.Time), dayOfMonth = spec.DayOfMonth };
                 case TriggerKind.Boot:
-                    return new { type = "boot" };
+                    return new { kind = "boot" };
+                case TriggerKind.Logon:
+                    return new { kind = "logon" };
+                case TriggerKind.Idle:
+                    return new
+                    {
+                        kind = "idle",
+                        idleSettings = spec.IdleSettings == null ? null : new
+                        {
+                            waitTimeout = FmtTimeSpan(spec.IdleSettings.WaitTimeout),
+                            stopOnIdleEnd = spec.IdleSettings.StopOnIdleEnd,
+                            restartOnIdle = spec.IdleSettings.RestartOnIdle
+                        }
+                    };
+                case TriggerKind.Event:
+                    return new
+                    {
+                        kind = "event",
+                        eventSubscription = spec.EventSubscription,
+                        eventLog = spec.EventLog,
+                        eventSource = spec.EventSource,
+                        eventId = spec.EventId
+                    };
                 default:
-                    return new { type = "logon" };
+                    return new { kind = spec.Kind.ToString().ToLowerInvariant() };
             }
         }
 
         private static string FmtTime(TimeSpan? t)
         {
             return t.HasValue ? t.Value.ToString(@"hh\:mm") : null;
+        }
+
+        private static string FmtTimeSpan(TimeSpan? t)
+        {
+            return t.HasValue ? t.Value.ToString(@"hh\:mm\:ss") : null;
         }
 
         private static string DayCode(DayOfWeek d)

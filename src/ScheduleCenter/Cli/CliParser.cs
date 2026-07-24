@@ -39,13 +39,16 @@ namespace ScheduleCenter.Cli
     public static class CliParser
     {
         private static readonly HashSet<string> Commands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "add", "update", "delete", "get", "list", "enable", "disable", "run", "history" };
+        { "add", "update", "delete", "get", "list", "enable", "disable", "run", "history", "export", "import" };
 
         private static readonly HashSet<string> Flags = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "force", "run-as-system", "highest", "enabled", "start-when-available", "errors-only" };
+        { "force", "run-as-system", "highest", "enabled", "start-when-available", "errors-only",
+          "no-start-on-battery", "stop-on-battery", "idle-stop-on-end", "idle-restart" };
 
         private static readonly HashSet<string> ValueOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        { "name", "path", "args", "workdir", "trigger", "time", "date", "days", "day-of-month", "description", "filter", "last" };
+        { "name", "path", "args", "workdir", "trigger", "time", "date", "days", "day-of-month", "description", "filter", "last",
+          "triggers-json", "triggers-file", "event-log", "event-source", "event-id", "event-subscription",
+          "idle-wait", "execution-time-limit", "output", "file" };
 
         public static ParsedArgs Parse(string[] args)
         {
@@ -85,13 +88,55 @@ namespace ScheduleCenter.Cli
                     throw new TaskServiceException(ErrorCode.InvalidArguments, "未知选项 --" + key);
                 }
             }
+            ValidateMutualExclusion(result);
             return result;
+        }
+
+        internal static void ValidateMutualExclusion(ParsedArgs p)
+        {
+            bool hasTrigger = p.Has("trigger");
+            bool hasTriggersJson = p.Has("triggers-json");
+            bool hasTriggersFile = p.Has("triggers-file");
+            bool hasEventLog = p.Has("event-log");
+            bool hasEventSub = p.Has("event-subscription");
+            bool hasEventSource = p.Has("event-source");
+            bool hasEventId = p.Has("event-id");
+
+            int triggerSourceCount = (hasTrigger ? 1 : 0) + (hasTriggersJson ? 1 : 0) + (hasTriggersFile ? 1 : 0);
+            if (triggerSourceCount > 1)
+                throw new TaskServiceException(ErrorCode.InvalidArguments,
+                    "--trigger / --triggers-json / --triggers-file 互斥，只能指定一个");
+
+            if (hasEventLog && hasEventSub)
+                throw new TaskServiceException(ErrorCode.InvalidArguments,
+                    "--event-log 与 --event-subscription 互斥");
+
+            if ((hasEventSource || hasEventId) && !hasEventLog)
+                throw new TaskServiceException(ErrorCode.InvalidArguments,
+                    "--event-source / --event-id 必须与 --event-log 搭配使用");
+
+            // idle-* 仅在 trigger=idle 时允许（仅对单触发器语法有效；triggers-json 走 JSON 解析，不在此校验）
+            if (hasTrigger)
+            {
+                string triggerType = p.Get("trigger");
+                bool isIdle = triggerType != null && triggerType.ToLowerInvariant() == "idle";
+                if (!isIdle && (p.Has("idle-wait") || p.Has("idle-stop-on-end") || p.Has("idle-restart")))
+                    throw new TaskServiceException(ErrorCode.InvalidArguments,
+                        "--idle-* 参数仅在 --trigger idle 时可用");
+            }
+            else if (p.Has("idle-wait") || p.Has("idle-stop-on-end") || p.Has("idle-restart"))
+            {
+                throw new TaskServiceException(ErrorCode.InvalidArguments,
+                    "--idle-* 参数仅在 --trigger idle 时可用");
+            }
         }
 
         public static string Usage()
         {
-            return "用法: ScheduleCenter <add|update|delete|get|list|enable|disable|run|history> [选项]\n" +
-                   "示例: ScheduleCenter add --name Backup --path C:\\app.exe --trigger daily --time 09:00";
+            return "用法: ScheduleCenter <add|update|delete|get|list|enable|disable|run|history|export|import> [选项]\n" +
+                   "示例: ScheduleCenter add --name Backup --path C:\\app.exe --trigger daily --time 09:00\n" +
+                   "      ScheduleCenter add --name Backup --path C:\\app.exe --triggers-json '[{\"kind\":\"daily\",\"time\":\"09:00\"}]'\n" +
+                   "      ScheduleCenter export --name Backup --output C:\\backup.xml";
         }
     }
 }

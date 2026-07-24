@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Newtonsoft.Json;
 
 namespace ScheduleCenter.Core
 {
@@ -15,18 +17,56 @@ namespace ScheduleCenter.Core
                 sb.Append(" --args \"").Append(task.Arguments).Append("\"");
             if (!string.IsNullOrEmpty(task.WorkingDirectory))
                 sb.Append(" --workdir \"").Append(task.WorkingDirectory).Append("\"");
-            AppendTriggerArgs(sb, task.Triggers != null && task.Triggers.Count > 0 ? task.Triggers[0] : null);
+
+            AppendTriggersArg(sb, task.Triggers);
+
             if (task.RunAsSystem) sb.Append(" --run-as-system");
             if (task.Highest) sb.Append(" --highest");
             if (!string.IsNullOrEmpty(task.Description))
                 sb.Append(" --description \"").Append(task.Description).Append("\"");
             if (task.Enabled) sb.Append(" --enabled");
+
+            AppendAdvancedConditions(sb, task);
+
             return sb.ToString();
         }
 
-        private static void AppendTriggerArgs(StringBuilder sb, TriggerSpec trigger)
+        private static void AppendTriggersArg(StringBuilder sb, IList<TriggerSpec> triggers)
         {
-            if (trigger == null) return;
+            if (triggers == null || triggers.Count == 0) return;
+
+            if (triggers.Count == 1)
+            {
+                AppendSingleTriggerArgs(sb, triggers[0]);
+                return;
+            }
+
+            // 多触发器：输出 --triggers-json
+            var jsonTriggers = triggers.Select(t => new
+            {
+                kind = KindCode(t.Kind),
+                time = t.Time.HasValue ? t.Time.Value.ToString(@"hh\:mm") : (string)null,
+                date = t.Date.HasValue ? t.Date.Value.ToString("yyyy-MM-dd") : (string)null,
+                days = t.Days == null ? null : t.Days.Select(DayCode).ToArray(),
+                dayOfMonth = t.DayOfMonth,
+                idleSettings = t.IdleSettings == null ? null : new
+                {
+                    waitTimeout = t.IdleSettings.WaitTimeout.HasValue ? t.IdleSettings.WaitTimeout.Value.ToString(@"hh\:mm\:ss") : (string)null,
+                    stopOnIdleEnd = t.IdleSettings.StopOnIdleEnd,
+                    restartOnIdle = t.IdleSettings.RestartOnIdle
+                },
+                eventSubscription = t.EventSubscription,
+                eventLog = t.EventLog,
+                eventSource = t.EventSource,
+                eventId = t.EventId
+            }).ToList();
+
+            string json = JsonConvert.SerializeObject(jsonTriggers, Formatting.None);
+            sb.Append(" --triggers-json '").Append(json).Append("'");
+        }
+
+        private static void AppendSingleTriggerArgs(StringBuilder sb, TriggerSpec trigger)
+        {
             switch (trigger.Kind)
             {
                 case TriggerKind.Once:
@@ -55,6 +95,53 @@ namespace ScheduleCenter.Core
                 case TriggerKind.Logon:
                     sb.Append(" --trigger logon");
                     break;
+                case TriggerKind.Idle:
+                    sb.Append(" --trigger idle");
+                    if (trigger.IdleSettings != null)
+                    {
+                        if (trigger.IdleSettings.WaitTimeout.HasValue)
+                            sb.Append(" --idle-wait ").Append((int)trigger.IdleSettings.WaitTimeout.Value.TotalMinutes);
+                        if (trigger.IdleSettings.StopOnIdleEnd) sb.Append(" --idle-stop-on-end");
+                        if (trigger.IdleSettings.RestartOnIdle) sb.Append(" --idle-restart");
+                    }
+                    break;
+                case TriggerKind.Event:
+                    sb.Append(" --trigger event");
+                    if (!string.IsNullOrEmpty(trigger.EventSubscription))
+                        sb.Append(" --event-subscription \"").Append(trigger.EventSubscription).Append("\"");
+                    else if (!string.IsNullOrEmpty(trigger.EventLog))
+                    {
+                        sb.Append(" --event-log ").Append(trigger.EventLog);
+                        if (!string.IsNullOrEmpty(trigger.EventSource))
+                            sb.Append(" --event-source ").Append(trigger.EventSource);
+                        if (trigger.EventId.HasValue)
+                            sb.Append(" --event-id ").Append(trigger.EventId.Value);
+                    }
+                    break;
+            }
+        }
+
+        private static void AppendAdvancedConditions(StringBuilder sb, TaskInfo task)
+        {
+            if (task.ExecutionTimeLimit.HasValue)
+                sb.Append(" --execution-time-limit ").Append((int)task.ExecutionTimeLimit.Value.TotalMinutes);
+            if (task.DisallowStartIfOnBatteries) sb.Append(" --no-start-on-battery");
+            if (task.StopIfGoingOnBatteries) sb.Append(" --stop-on-battery");
+        }
+
+        private static string KindCode(TriggerKind k)
+        {
+            switch (k)
+            {
+                case TriggerKind.Once: return "once";
+                case TriggerKind.Daily: return "daily";
+                case TriggerKind.Weekly: return "weekly";
+                case TriggerKind.Monthly: return "monthly";
+                case TriggerKind.Boot: return "boot";
+                case TriggerKind.Logon: return "logon";
+                case TriggerKind.Idle: return "idle";
+                case TriggerKind.Event: return "event";
+                default: return k.ToString().ToLowerInvariant();
             }
         }
 
